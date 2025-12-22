@@ -10,15 +10,17 @@ local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 
 --------------------------------------------------------------------------------
--- ⚙️ CONFIGURATION (CHECK THESE!)
+-- ⚙️ CONFIGURATION (EDIT THIS SECTION!)
 --------------------------------------------------------------------------------
 local GITHUB_USER = "Wubbalubbadubdub4"
-local REPO_NAME = "Roblox-Gaming-Hub" -- Make sure this is EXACT
+local REPO_NAME = "Roblox-Gaming-Hub" 
 local BRANCH = "main"
+
+-- PASTE YOUR LINKVERTISE LINK HERE (The link that leads to the key)
+local LINKVERTISE_LINK = "https://linkvertise.com/YOUR_LINK_HERE" 
 
 local KEY_URL = "https://raw.githubusercontent.com/"..GITHUB_USER.."/"..REPO_NAME.."/"..BRANCH.."/key.txt"
 local HUB_URL = "https://raw.githubusercontent.com/"..GITHUB_USER.."/"..REPO_NAME.."/"..BRANCH.."/MainHub.lua"
-local DISCORD_LINK = "https://discord.gg/yourlink" -- Optional
 
 --------------------------------------------------------------------------------
 -- 🎨 UI CONSTRUCTION
@@ -27,7 +29,7 @@ local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "NexusProLogin"
 if gethui then ScreenGui.Parent = gethui() else ScreenGui.Parent = CoreGui end
 
--- Main Container (Hidden at start for animation)
+-- Main Container
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 0, 0, 0) -- Starts invisible
 MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -42,7 +44,7 @@ local MainCorner = Instance.new("UICorner")
 MainCorner.CornerRadius = UDim.new(0, 15)
 MainCorner.Parent = MainFrame
 
--- Neon Border (Gradient Stroke)
+-- Neon Border
 local UIStroke = Instance.new("UIStroke")
 UIStroke.Thickness = 3
 UIStroke.Parent = MainFrame
@@ -56,7 +58,6 @@ UIGradient.Color = ColorSequence.new{
 UIGradient.Rotation = 45
 UIGradient.Parent = UIStroke
 
--- Animate Gradient
 spawn(function()
     while true do
         local tween = TweenService:Create(UIGradient, TweenInfo.new(2, Enum.EasingStyle.Linear), {Rotation = UIGradient.Rotation + 360})
@@ -86,7 +87,7 @@ SubTitle.Font = Enum.Font.Gotham
 SubTitle.TextSize = 12
 SubTitle.Parent = MainFrame
 
--- Input Box Container
+-- Input Box
 local InputContainer = Instance.new("Frame")
 InputContainer.Size = UDim2.new(0.8, 0, 0, 45)
 InputContainer.Position = UDim2.new(0.1, 0, 0.35, 0)
@@ -103,6 +104,7 @@ KeyBox.PlaceholderText = "Paste Key Here..."
 KeyBox.Text = ""
 KeyBox.Font = Enum.Font.GothamBold
 KeyBox.TextSize = 14
+KeyBox.ClearTextOnFocus = false 
 KeyBox.Parent = InputContainer
 
 -- Button Function
@@ -121,7 +123,6 @@ local function CreateButton(text, pos, color, callback)
     Corner.CornerRadius = UDim.new(0, 8)
     Corner.Parent = Btn
     
-    -- Hover Animation
     Btn.MouseEnter:Connect(function()
         TweenService:Create(Btn, TweenInfo.new(0.2), {Size = UDim2.new(0.4, 0, 0, 42)}):Play()
     end)
@@ -133,20 +134,25 @@ local function CreateButton(text, pos, color, callback)
     return Btn
 end
 
+--------------------------------------------------------------------------------
+-- 🔗 BUTTON LOGIC (Linkvertise Integration)
+--------------------------------------------------------------------------------
 local GetKeyBtn = CreateButton("GET KEY", UDim2.new(0.1, 0, 0.6, 0), Color3.fromRGB(255, 150, 0), function()
-    setclipboard(DISCORD_LINK) -- Or linkvertise
+    -- Copy the Linkvertise link to clipboard
+    setclipboard(LINKVERTISE_LINK) 
+    
     game.StarterGui:SetCore("SendNotification", {
-        Title = "Link Copied";
-        Text = "Paste in browser to get key!";
-        Duration = 3;
+        Title = "Link Copied!";
+        Text = "Complete the link to get the NEW Key.";
+        Duration = 5;
     })
 end)
 
 local LoginBtn = CreateButton("LOGIN", UDim2.new(0.52, 0, 0.6, 0), Color3.fromRGB(0, 180, 255), function()
-   -- LOGIC IS BELOW
+   -- Logic handled below
 end)
 
--- 🏃‍♂️ SLIDING TEXT (MARQUEE)
+-- Sliding Text
 local ClipFrame = Instance.new("Frame")
 ClipFrame.Size = UDim2.new(1, -20, 0, 30)
 ClipFrame.Position = UDim2.new(0, 10, 0.85, 0)
@@ -155,8 +161,8 @@ ClipFrame.ClipsDescendants = true
 ClipFrame.Parent = MainFrame
 
 local SlidingText = Instance.new("TextLabel")
-SlidingText.Text = "✅ STATUS: UNDETECTED | 🛡️ VERSION: 3.5 | 👋 WELCOME TO ROBLOX GAMING HUB | 🔑 GET KEY TO ACCESS SCRIPTS"
-SlidingText.Size = UDim2.new(0, 600, 1, 0) -- Wide text
+SlidingText.Text = "✅ STATUS: UNDETECTED | 🛡️ NEXUS PROTECTOR | 🔑 KEY CHANGES DAILY - GET NEW KEY IF LOGIN FAILS"
+SlidingText.Size = UDim2.new(0, 600, 1, 0)
 SlidingText.Position = UDim2.new(1, 0, 0, 0)
 SlidingText.BackgroundTransparency = 1
 SlidingText.TextColor3 = Color3.fromRGB(0, 255, 150)
@@ -164,7 +170,6 @@ SlidingText.Font = Enum.Font.Code
 SlidingText.TextSize = 14
 SlidingText.Parent = ClipFrame
 
--- Sliding Logic
 spawn(function()
     while true do
         SlidingText.Position = UDim2.new(1, 0, 0, 0)
@@ -175,20 +180,19 @@ spawn(function()
 end)
 
 --------------------------------------------------------------------------------
--- 🔐 LOGIC
+-- 🔐 CHECK KEY LOGIC
 --------------------------------------------------------------------------------
-
--- Open Animation (Pop Up)
 MainFrame.Size = UDim2.new(0, 0, 0, 0)
 TweenService:Create(MainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Back), {Size = UDim2.new(0, 450, 0, 280)}):Play()
 TweenService:Create(MainFrame, TweenInfo.new(0.6, Enum.EasingStyle.Back), {Position = UDim2.new(0.5, -225, 0.5, -140)}):Play()
 
--- Check Key Logic
 LoginBtn.MouseButton1Click:Connect(function()
     LoginBtn.Text = "Checking..."
     
     local success, result = pcall(function()
+        -- Fetch key from GitHub, remove spaces and newlines
         local onlineKey = game:HttpGet(KEY_URL):gsub("\n", ""):gsub(" ", "")
+        -- Check if input matches
         return KeyBox.Text == onlineKey
     end)
     
@@ -197,32 +201,25 @@ LoginBtn.MouseButton1Click:Connect(function()
         LoginBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
         UIStroke.Color = Color3.fromRGB(0, 255, 0)
         
-        -- Success Sound
         local sound = Instance.new("Sound", workspace)
-        sound.SoundId = "rbxassetid://6895079853" -- Tech success sound
+        sound.SoundId = "rbxassetid://6895079853"
         sound:Play()
         
         wait(1)
-        
-        -- Close Animation
         TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)}):Play()
         wait(0.5)
         ScreenGui:Destroy()
         
-        -- LOAD HUB
         loadstring(game:HttpGet(HUB_URL))()
     else
         LoginBtn.Text = "INVALID KEY"
         LoginBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-        
-        -- Error Shake
         for i = 1, 5 do
             MainFrame.Position = MainFrame.Position + UDim2.new(0, 5, 0, 0)
             wait(0.05)
             MainFrame.Position = MainFrame.Position - UDim2.new(0, 5, 0, 0)
             wait(0.05)
         end
-        
         wait(1)
         LoginBtn.Text = "LOGIN"
         LoginBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 255)
