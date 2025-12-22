@@ -1,0 +1,32 @@
+name: Gunluk Key Robotu
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Her gece 00:00'da çalışır
+  workflow_dispatch: # Manuel çalıştırma butonu ekler
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Depoyu Çek
+        uses: actions/checkout@v3
+
+      - name: Python Kur
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Scripti Calistir
+        run: python update_key.py
+
+      - name: Kaydet ve Guncelle
+        run: |
+          git config --global user.name "Nexus Bot"
+          git config --global user.email "bot@nexus.com"
+          git add key.txt index.html
+          git commit -m "Otomatik Key Guncellemesi" || exit 0
+          git push
