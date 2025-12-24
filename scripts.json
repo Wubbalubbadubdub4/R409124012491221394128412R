@@ -72,6 +72,12 @@
     "GlobalScript": true
   },
   {
+    "name": "Roblox Blade Ball Auto Parry/Dodge/Walk",
+    "file": "securelua_5049293.lua",
+    "gameId": "16281300371",
+    "GlobalScript": false
+  },
+  {
     "name": "Blank (dont mind me blud)",
     "file": "Blank",
     "gameId": "0",
