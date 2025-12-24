@@ -1,3 +1,4 @@
+-- RGH BLADE BALL ULTIMATE (FIXED V2)
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
@@ -7,16 +8,16 @@ local player = Players.LocalPlayer
 local char = player.Character or player.CharacterAdded:Wait()
 local root = char:WaitForChild("HumanoidRootPart")
 
--- --- SABİT DEĞERLER ---
+-- --- AYARLAR ---
 local DEFAULT_RANGE = 12
-local DEFAULT_PAD = 12
+local DEFAULT_PAD = 10
 local REACTION_TIME = 0.16
-local DODGE_POWER = 40
-local DODGE_DURATION = 0.5
+local DODGE_POWER = 70
+local DODGE_DURATION = 0.2
 local PARRY_KEY = Enum.KeyCode.F
-local WALK_DISTANCE = 15
+local WALK_DISTANCE = 25 
 
--- --- DURUM DEĞİŞKENLERİ ---
+-- --- DEĞİŞKENLER ---
 local isDefaultSettings = true
 local isParryEnabled = false
 local isDodgeEnabled = false
@@ -29,9 +30,13 @@ local lastParryTick = 0
 local lastDodgeTick = 0
 local lastWalkTick = 0
 
--- --- UI OLUŞTURMA ---
+-- --- UI OLUŞTURMA (GÜVENLİ MOD) ---
+if player.PlayerGui:FindFirstChild("BladeBall_Fixed_Hub_v2") then
+    player.PlayerGui.BladeBall_Fixed_Hub_v2:Destroy()
+end
+
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "BladeBall_Fixed_Hub"
+screenGui.Name = "BladeBall_Fixed_Hub_v2"
 screenGui.Parent = player:WaitForChild("PlayerGui")
 screenGui.ResetOnSpawn = false
 
@@ -107,61 +112,9 @@ local settingsCorner = Instance.new("UICorner")
 settingsCorner.CornerRadius = UDim.new(0, 10)
 settingsCorner.Parent = settingsFrame
 
--- Default Switch
-local defSwitchBtn = Instance.new("TextButton")
-defSwitchBtn.Size = UDim2.new(1, -20, 0, 35)
-defSwitchBtn.Position = UDim2.new(0, 10, 0, 10)
-defSwitchBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 120) 
-defSwitchBtn.Text = "MODE: DEFAULT SETTINGS"
-defSwitchBtn.TextColor3 = Color3.fromRGB(10, 10, 10)
-defSwitchBtn.Font = Enum.Font.GothamBold
-defSwitchBtn.TextSize = 12
-defSwitchBtn.Parent = settingsFrame
+-- --- INPUT KUTULARI (ÖNCE BUNLARI OLUŞTURUYORUZ) ---
+-- Bu sayede buton bunlara erişirken hata vermez
 
-local switchCorner = Instance.new("UICorner")
-switchCorner.CornerRadius = UDim.new(0, 6)
-switchCorner.Parent = defSwitchBtn
-
--- GLOBAL INPUT VARIABLES (Önceden tanımlandı)
-local rangeBox
-local padBox
-
-defSwitchBtn.MouseButton1Click:Connect(function()
-    isDefaultSettings = not isDefaultSettings
-    if isDefaultSettings then
-        defSwitchBtn.Text = "MODE: DEFAULT SETTINGS"
-        defSwitchBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 120)
-        defSwitchBtn.TextColor3 = Color3.fromRGB(10, 10, 10)
-        currentRange = DEFAULT_RANGE
-        currentPad = DEFAULT_PAD
-        
-        if rangeBox then
-            rangeBox.Text = tostring(DEFAULT_RANGE)
-            rangeBox.TextEditable = false
-            rangeBox.TextColor3 = Color3.fromRGB(100, 100, 100)
-        end
-        if padBox then
-            padBox.Text = tostring(DEFAULT_PAD)
-            padBox.TextEditable = false
-            padBox.TextColor3 = Color3.fromRGB(100, 100, 100)
-        end
-    else
-        defSwitchBtn.Text = "MODE: CUSTOM SETTINGS"
-        defSwitchBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-        defSwitchBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        
-        if rangeBox then
-            rangeBox.TextEditable = true
-            rangeBox.TextColor3 = Color3.fromRGB(0, 255, 255)
-        end
-        if padBox then
-            padBox.TextEditable = true
-            padBox.TextColor3 = Color3.fromRGB(255, 200, 0)
-        end
-    end
-end); -- Semicolon eklendi
-
--- Inputs Helper
 local function CreateInput(labelText, yPos, defaultVal, callback)
     local lbl = Instance.new("TextLabel")
     lbl.Text = labelText
@@ -195,16 +148,75 @@ local function CreateInput(labelText, yPos, defaultVal, callback)
     box.FocusLost:Connect(function()
         if not isDefaultSettings then
             local num = tonumber(box.Text)
-            if num then callback(num) end
+            if num then 
+                callback(num) 
+            else
+                -- Eğer sayı girilmediyse eski değere dön (Hata önleyici)
+                box.Text = tostring(defaultVal)
+            end
         end
     end)
     return box
-end;
+end
 
-rangeBox = CreateInput("Parry Range:", 55, DEFAULT_RANGE, function(val) currentRange = val or currentRange end)
-padBox = CreateInput("Hitbox Pad:", 95, DEFAULT_PAD, function(val) currentPad = val or currentPad end)
+-- Inputları oluşturup değişkenlere atıyoruz
+local rangeBox = CreateInput("Parry Range:", 55, DEFAULT_RANGE, function(val) currentRange = val end)
+local padBox = CreateInput("Hitbox Pad:", 95, DEFAULT_PAD, function(val) currentPad = val end)
 
--- --- BUTTONS (PARRY, DODGE, WALK) ---
+-- --- MODE SWITCH (ŞİMDİ OLUŞTURUYORUZ) ---
+-- Artık rangeBox ve padBox kesinlikle var, hata veremez.
+
+local defSwitchBtn = Instance.new("TextButton")
+defSwitchBtn.Size = UDim2.new(1, -20, 0, 35)
+defSwitchBtn.Position = UDim2.new(0, 10, 0, 10)
+defSwitchBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 120) 
+defSwitchBtn.Text = "MODE: DEFAULT SETTINGS"
+defSwitchBtn.TextColor3 = Color3.fromRGB(10, 10, 10)
+defSwitchBtn.Font = Enum.Font.GothamBold
+defSwitchBtn.TextSize = 12
+defSwitchBtn.Parent = settingsFrame
+
+local switchCorner = Instance.new("UICorner")
+switchCorner.CornerRadius = UDim.new(0, 6)
+switchCorner.Parent = defSwitchBtn
+
+defSwitchBtn.MouseButton1Click:Connect(function()
+    isDefaultSettings = not isDefaultSettings
+    
+    if isDefaultSettings then
+        -- DEFAULT MODE
+        defSwitchBtn.Text = "MODE: DEFAULT SETTINGS"
+        defSwitchBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 120)
+        defSwitchBtn.TextColor3 = Color3.fromRGB(10, 10, 10)
+        
+        -- Değerleri sıfırla
+        currentRange = DEFAULT_RANGE
+        currentPad = DEFAULT_PAD
+        
+        -- Kutuları kilitle
+        rangeBox.Text = tostring(DEFAULT_RANGE)
+        rangeBox.TextEditable = false
+        rangeBox.TextColor3 = Color3.fromRGB(100, 100, 100)
+        
+        padBox.Text = tostring(DEFAULT_PAD)
+        padBox.TextEditable = false
+        padBox.TextColor3 = Color3.fromRGB(100, 100, 100)
+    else
+        -- CUSTOM MODE
+        defSwitchBtn.Text = "MODE: CUSTOM SETTINGS"
+        defSwitchBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+        defSwitchBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        
+        -- Kutuları aç
+        rangeBox.TextEditable = true
+        rangeBox.TextColor3 = Color3.fromRGB(0, 255, 255)
+        
+        padBox.TextEditable = true
+        padBox.TextColor3 = Color3.fromRGB(255, 200, 0)
+    end
+end)
+
+-- --- ANA BUTONLAR (PARRY, DODGE, WALK) ---
 
 local function CreateToggleButton(btnText, yPos, color, callback)
     local btn = Instance.new("TextButton")
@@ -241,7 +253,7 @@ local function CreateToggleButton(btnText, yPos, color, callback)
         end
     end)
     return btn
-end;
+end
 
 CreateToggleButton("AUTO-PARRY", 210, Color3.fromRGB(0, 255, 120), function()
     isParryEnabled = not isParryEnabled
@@ -258,7 +270,7 @@ CreateToggleButton("AUTO-WALK", 320, Color3.fromRGB(255, 150, 0), function()
     return isWalkEnabled
 end)
 
--- --- LOGIC FUNCTIONS ---
+-- --- FİZİK VE MANTIK FONKSİYONLARI ---
 
 local function PerformSafeDodge(ballPart)
     if not root then return end
@@ -306,7 +318,7 @@ local function PerformSafeDodge(ballPart)
         bv.Parent = root
         Debris:AddItem(bv, DODGE_DURATION)
     end
-end;
+end
 
 local function PerformAutoWalk()
     if tick() - lastWalkTick < 0.1 then return end
@@ -317,6 +329,7 @@ local function PerformAutoWalk()
     local threatPos = nil
     local shortestDist = 1000
 
+    -- En yakın oyuncu
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
             local dist = (p.Character.HumanoidRootPart.Position - root.Position).Magnitude
@@ -327,6 +340,7 @@ local function PerformAutoWalk()
         end
     end
 
+    -- En yakın top
     local ballsFolder = workspace:FindFirstChild("Balls")
     if ballsFolder then
         for _, ball in pairs(ballsFolder:GetChildren()) do
@@ -367,7 +381,7 @@ local function PerformAutoWalk()
         local hum = char:FindFirstChild("Humanoid")
         if hum then hum:MoveTo(targetPos) end
     end
-end;
+end
 
 -- --- MAIN LOOP ---
 
