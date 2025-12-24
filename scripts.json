@@ -1,0 +1,80 @@
+[
+  {
+    "name": "Roblox Ability Wars Premium Autofarm",
+    "file": "securelua_90482.lua",
+    "gameId": "8260276694",
+    "GlobalScript": false
+  },
+  {
+    "name": "Roblox Bloxburg Autofarm Janitor",
+    "file": "securelua_4028348.lua",
+    "gameId": "185655149",
+    "GlobalScript": false
+  },
+  {
+    "name": "Roblox Breadwinner World Autofarm",
+    "file": "securelua_958203483.lua",
+    "gameId": "13412842185",
+    "GlobalScript": false
+  },
+  {
+    "name": "Roblox Cut Trees Bypass",
+    "file": "securelua_4283274.lua",
+    "gameId": "135880624242201",
+    "GlobalScript": false
+  },
+  {
+    "name": "Screen Gui Detector (Might Lag)",
+    "file": "securelua_492742214.lua",
+    "gameId": "0",
+    "GlobalScript": true
+  },
+  {
+    "name": "Roblox Prison Life Premium Bypass Handler",
+    "file": "securelua_482734764.lua",
+    "gameId": "155615604",
+    "GlobalScript": false
+  },
+  {
+    "name": "Roblox Aimbot Premium Edition",
+    "file": "securelua_59345743537194.lua",
+    "gameId": "0",
+    "GlobalScript": true
+  },
+  {
+    "name": "Roblox Blindspot Script (Auto move + Esp + Auto Aim)",
+    "file": "securelua_04892.lua",
+    "gameId": "118614517739521",
+    "GlobalScript": false
+  },
+  {
+    "name": "Roblox Murder Myster 2 Esp",
+    "file": "mm2esproblox.lua",
+    "gameId": "142823291",
+    "GlobalScript": false
+  },
+  {
+    "name": "Roblox The Forge Autofarm (With Safety Button)",
+    "file": "securelua_4927471312.lua",
+    "gameId": "76558904092080",
+    "GlobalScript": false
+  },
+  {
+    "name": "Roblox Tank Game Esp + Speed Bypass + Vip Bypass",
+    "file": "securelua_4284721714124.lua",
+    "gameId": "119789365111500",
+    "GlobalScript": false
+  },
+  {
+    "name": "Infinite Yield Admin",
+    "file": "infiniteyieldadmin.lua",
+    "gameId": "0",
+    "GlobalScript": true
+  },
+  {
+    "name": "Blank (dont mind me blud)",
+    "file": "Blank",
+    "gameId": "0",
+    "GlobalScript": false
+  }
+]
