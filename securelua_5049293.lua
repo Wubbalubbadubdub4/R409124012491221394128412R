@@ -1,5 +1,5 @@
--- RGH BLADE BALL ULTIMATE (V9.1 - CRASH FIX + 4% SCALE + LAYERS)
--- Features: 0.25s Reaction, 4% Reality Scale, Dynamic Panic Layers, Anti-Crash
+-- RGH BLADE BALL ULTIMATE (V11 - CYLINDRICAL HITBOX + 4% SCALE)
+-- Features: Cylindrical Detection (Circle), Vertical Limit, Dynamic Panic Layers
 
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -13,9 +13,10 @@ local root = char:WaitForChild("HumanoidRootPart")
 
 -- --- CONFIGURATION ---
 local DEFAULT_RANGE = 20
-local DEFAULT_PAD = 14     
-local PANIC_DIST = 7         -- Layer 1 Base Distance
-local LAST_LAYER_DIST = 4    -- Layer 2 Base Distance
+local DEFAULT_PAD = 14       -- The "Circle" Radius
+local PANIC_DIST = 7         -- Layer 1: Panic Press
+local LAST_LAYER_DIST = 4    -- Layer 2: Final Protection
+local Y_AXIS_LIMIT = 30      -- [STRICT] Vertical Limit (Ignore balls higher than this)
 local REACTION_TIME = 0.25 
 local DODGE_POWER = 28       
 local DODGE_DURATION = 0.25 
@@ -85,11 +86,12 @@ local function UpdateVisualizer(isTargeted, currentDynamicSize)
         visualizerPart.Transparency = 0.85
     end
 
+    -- Visualizes the "Circle" on the ground
     local sizeToUse = currentDynamicSize or currentRange
     local safeRange = math.clamp(sizeToUse, 5, 300) 
     local size = safeRange * 2
     
-    visualizerPart.Size = Vector3.new(1, size, size)
+    visualizerPart.Size = Vector3.new(1, size, size) -- Flat Cylinder
     visualizerPart.CFrame = root.CFrame * CFrame.Angles(0, 0, math.rad(90))
 end
 
@@ -290,7 +292,7 @@ end
 -- --- FAST BALL TRACKING & MAIN LOOP ---
 
 RunService.PreSimulation:Connect(function()
-    -- [FIX] Ensure Character/Root exists before doing anything
+    -- [SAFEGUARD] Character check
     if not char or not char.Parent then
         char = player.Character
         if char then root = char:FindFirstChild("HumanoidRootPart") end
@@ -314,13 +316,12 @@ RunService.PreSimulation:Connect(function()
     local finalEffectiveRange = currentRange 
     local currentRealityBuff = 0 
 
-    if activeBall and activeBall.Parent then -- [FIX] Added parent check
+    if activeBall and activeBall.Parent then 
         local targetName = activeBall:GetAttribute("target")
         isTargetingMe = (targetName == player.Name)
         
         -- DYNAMIC SCALING CALCULATION
         if isTargetingMe then
-            -- [FIX] Double check existence before math
             if not activeBall or not activeBall.Parent or not root or not root.Parent then return end 
 
             local velocity = activeBall.AssemblyLinearVelocity
@@ -349,35 +350,47 @@ RunService.PreSimulation:Connect(function()
 
     -- INTERACTION LOGIC
     if isTargetingMe then
-        -- [FIX] Triple check existence before physics interaction
         if not activeBall or not activeBall.Parent or not root or not root.Parent then return end 
 
+        -- 1. CALCULATE VECTORS
         local velocity = activeBall.AssemblyLinearVelocity
         local relativePos = activeBall.Position - root.Position
         
+        -- 2. SPLIT HORIZONTAL VS VERTICAL (CYLINDER LOGIC)
+        local verticalDistance = math.abs(relativePos.Y)
+        local horizontalDistance = Vector3.new(relativePos.X, 0, relativePos.Z).Magnitude
+
+        -- [FIX] VERTICAL LIMIT: If ball is > 30 studs UP, IGNORE IT.
+        if verticalDistance > Y_AXIS_LIMIT then return end 
+
         local speedTowardsMe = -relativePos.Unit:Dot(velocity)
-        
         local ping = GetPing()
         local pingOffset = speedTowardsMe * ping
         local rawRadius = math.max(activeBall.Size.X, activeBall.Size.Z) / 2
         
-        local effectiveDistance = (relativePos.Magnitude - rawRadius - currentPad) - pingOffset
+        -- [FIX] Effective Distance is now based on HORIZONTAL (The Circle)
+        -- We effectively assume the ball is on our level if it passed the Y-Limit check
+        local effectiveDistance = (horizontalDistance - rawRadius - currentPad) - pingOffset
         
-        -- *** PARRY LOGIC (PERFECT ONE TAP) ***
+        -- *** PARRY LOGIC ***
         if isParryEnabled then
             if speedTowardsMe > 0 then
-                local dist = relativePos.Magnitude
-
-                -- DYNAMIC PANIC LAYERS
-                if dist <= (PANIC_DIST + currentRealityBuff) then
+                
+                -- PANIC LAYERS: Use 3D Distance (Spherical) for Close Range Safety
+                -- If the ball dives on your head, 3D distance catches it.
+                local dist3D = relativePos.Magnitude 
+                
+                -- [LAYER 1] PANIC (Base 7 + Scale)
+                if dist3D <= (PANIC_DIST + currentRealityBuff) then
                      PressParry() 
                 end
 
-                if dist <= (LAST_LAYER_DIST + currentRealityBuff) then
+                -- [LAYER 2] FINAL PROTECTION (Base 4 + Scale)
+                if dist3D <= (LAST_LAYER_DIST + currentRealityBuff) then
                      PressParry() 
                 end
 
-                -- STANDARD PRECISION
+                -- [LAYER 3] STANDARD PRECISION (Uses Horizontal Cylinder)
                 if effectiveDistance <= finalEffectiveRange then
                     if not hasParriedCurrentInteraction then
                         PressParry()
@@ -392,6 +405,7 @@ RunService.PreSimulation:Connect(function()
             local dynamicCooldown = 0.4
             if speedTowardsMe > 0 then dynamicCooldown = 0.2 end
             
+            -- Dodge also uses Horizontal Distance for consistency
             local timeToImpact = effectiveDistance / math.max(1, speedTowardsMe)
             if timeToImpact <= (REACTION_TIME + 0.3) and effectiveDistance > 10 then
                 if tick() - lastDodgeTick > dynamicCooldown then
