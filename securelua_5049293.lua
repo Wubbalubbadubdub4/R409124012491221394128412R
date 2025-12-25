@@ -1,5 +1,6 @@
--- RGH BLADE BALL ULTIMATE (V11 - CYLINDRICAL HITBOX + 4% SCALE)
--- Features: Cylindrical Detection (Circle), Vertical Limit, Dynamic Panic Layers
+-- RGH BLADE BALL ULTIMATE (V14 - 20% PANIC BUFF)
+-- Updates: Panic & Last Layer Safety set to 20% (Balanced aggression)
+-- Config: Pad 14, Y-Limit 15, Dodge 15
 
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -13,12 +14,12 @@ local root = char:WaitForChild("HumanoidRootPart")
 
 -- --- CONFIGURATION ---
 local DEFAULT_RANGE = 20
-local DEFAULT_PAD = 14       -- The "Circle" Radius
-local PANIC_DIST = 7         -- Layer 1: Panic Press
-local LAST_LAYER_DIST = 4    -- Layer 2: Final Protection
-local Y_AXIS_LIMIT = 30      -- [STRICT] Vertical Limit (Ignore balls higher than this)
+local DEFAULT_PAD = 14        -- [USER SET] Tightened Circle Radius
+local PANIC_DIST = 7          -- Layer 1 Base
+local LAST_LAYER_DIST = 4     -- Layer 2 Base
+local Y_AXIS_LIMIT = 15       -- [USER SET] Strict Vertical Limit
 local REACTION_TIME = 0.25 
-local DODGE_POWER = 28       
+local DODGE_POWER = 15        -- [USER SET] Lower Dodge Power
 local DODGE_DURATION = 0.25 
 local PARRY_KEY = Enum.KeyCode.F
 
@@ -38,7 +39,7 @@ local currentRange = DEFAULT_RANGE
 local currentPad = DEFAULT_PAD
 
 local lastDodgeTick = 0
-local hasParriedCurrentInteraction = false -- THE LOCK VARIABLE
+local hasParriedCurrentInteraction = false 
 
 local activeBall = nil 
 local visualizerPart = nil
@@ -289,10 +290,45 @@ local function PerformSmoothDodge(ballPart)
     Debris:AddItem(bv, DODGE_DURATION)
 end
 
--- --- FAST BALL TRACKING & MAIN LOOP ---
+-- --- SMART BALL TRACKING ---
+local function FindBestBall()
+    local ballsFolder = workspace:FindFirstChild("Balls")
+    if not ballsFolder then return nil end
+    
+    local bestBall = nil
+    local shortestDist = math.huge
+    local myName = player.Name
+    
+    for _, ball in ipairs(ballsFolder:GetChildren()) do
+        if ball:IsA("BasePart") then
+            local target = ball:GetAttribute("target")
+            local isTargetingMe = (target == myName)
+            local dist = (ball.Position - root.Position).Magnitude
+            
+            if isTargetingMe then
+                if bestBall and bestBall:GetAttribute("target") == myName then
+                    if dist < shortestDist then
+                        bestBall = ball
+                        shortestDist = dist
+                    end
+                else
+                    bestBall = ball
+                    shortestDist = dist
+                end
+            elseif not bestBall or bestBall:GetAttribute("target") ~= myName then
+                if dist < shortestDist then
+                    bestBall = ball
+                    shortestDist = dist
+                end
+            end
+        end
+    end
+    return bestBall
+end
+
+-- --- MAIN LOOP ---
 
 RunService.PreSimulation:Connect(function()
-    -- [SAFEGUARD] Character check
     if not char or not char.Parent then
         char = player.Character
         if char then root = char:FindFirstChild("HumanoidRootPart") end
@@ -300,41 +336,24 @@ RunService.PreSimulation:Connect(function()
     end
     if not root or not root.Parent then return end
 
-    if not activeBall or not activeBall.Parent then
-        local ballsFolder = workspace:FindFirstChild("Balls")
-        if ballsFolder then
-            for _, child in ipairs(ballsFolder:GetChildren()) do
-                if child:IsA("BasePart") then
-                    activeBall = child
-                    break
-                end
-            end
-        end
-    end
+    activeBall = FindBestBall()
 
     local isTargetingMe = false
     local finalEffectiveRange = currentRange 
-    local currentRealityBuff = 0 
 
     if activeBall and activeBall.Parent then 
         local targetName = activeBall:GetAttribute("target")
         isTargetingMe = (targetName == player.Name)
         
-        -- DYNAMIC SCALING CALCULATION
+        -- DYNAMIC SCALING (Range Only)
         if isTargetingMe then
-            if not activeBall or not activeBall.Parent or not root or not root.Parent then return end 
-
             local velocity = activeBall.AssemblyLinearVelocity
             local relativePos = activeBall.Position - root.Position
             local speedTowardsMe = -relativePos.Unit:Dot(velocity)
 
             if USE_DYNAMIC_SCALING and speedTowardsMe > 0 then
                 local extraRange = math.clamp(speedTowardsMe / SCALING_FACTOR, 0, MAX_SCALE_CAP)
-                local baseDynamic = currentRange + extraRange
-                
-                -- 4% REALITY ADDITION
-                currentRealityBuff = baseDynamic * 0.04 
-                finalEffectiveRange = baseDynamic + currentRealityBuff
+                finalEffectiveRange = currentRange + extraRange
             end
         end
     end
@@ -343,24 +362,19 @@ RunService.PreSimulation:Connect(function()
 
     if not activeBall or not activeBall.Parent then return end
 
-    -- STATE RESET
     if not isTargetingMe then
         hasParriedCurrentInteraction = false
     end
 
-    -- INTERACTION LOGIC
     if isTargetingMe then
         if not activeBall or not activeBall.Parent or not root or not root.Parent then return end 
 
-        -- 1. CALCULATE VECTORS
         local velocity = activeBall.AssemblyLinearVelocity
         local relativePos = activeBall.Position - root.Position
         
-        -- 2. SPLIT HORIZONTAL VS VERTICAL (CYLINDER LOGIC)
         local verticalDistance = math.abs(relativePos.Y)
         local horizontalDistance = Vector3.new(relativePos.X, 0, relativePos.Z).Magnitude
 
-        -- [FIX] VERTICAL LIMIT: If ball is > 30 studs UP, IGNORE IT.
         if verticalDistance > Y_AXIS_LIMIT then return end 
 
         local speedTowardsMe = -relativePos.Unit:Dot(velocity)
@@ -368,29 +382,24 @@ RunService.PreSimulation:Connect(function()
         local pingOffset = speedTowardsMe * ping
         local rawRadius = math.max(activeBall.Size.X, activeBall.Size.Z) / 2
         
-        -- [FIX] Effective Distance is now based on HORIZONTAL (The Circle)
-        -- We effectively assume the ball is on our level if it passed the Y-Limit check
         local effectiveDistance = (horizontalDistance - rawRadius - currentPad) - pingOffset
         
-        -- *** PARRY LOGIC ***
         if isParryEnabled then
             if speedTowardsMe > 0 then
                 
-                -- PANIC LAYERS: Use 3D Distance (Spherical) for Close Range Safety
-                -- If the ball dives on your head, 3D distance catches it.
                 local dist3D = relativePos.Magnitude 
                 
-                -- [LAYER 1] PANIC (Base 7 + Scale)
-                if dist3D <= (PANIC_DIST + currentRealityBuff) then
-                     PressParry() 
+                -- [LAYER 1] PANIC (Base 7 + 20% Increase)
+                if dist3D <= (PANIC_DIST * 1.2) then
+                      PressParry() 
                 end
 
-                -- [LAYER 2] FINAL PROTECTION (Base 4 + Scale)
-                if dist3D <= (LAST_LAYER_DIST + currentRealityBuff) then
-                     PressParry() 
+                -- [LAYER 2] FINAL PROTECTION (Base 4 + 20% Increase)
+                if dist3D <= (LAST_LAYER_DIST * 1.2) then
+                      PressParry() 
                 end
 
-                -- [LAYER 3] STANDARD PRECISION (Uses Horizontal Cylinder)
+                -- [LAYER 3] STANDARD PRECISION
                 if effectiveDistance <= finalEffectiveRange then
                     if not hasParriedCurrentInteraction then
                         PressParry()
@@ -400,12 +409,10 @@ RunService.PreSimulation:Connect(function()
             end
         end
 
-        -- *** DODGE LOGIC ***
         if isDodgeEnabled then
             local dynamicCooldown = 0.4
             if speedTowardsMe > 0 then dynamicCooldown = 0.2 end
             
-            -- Dodge also uses Horizontal Distance for consistency
             local timeToImpact = effectiveDistance / math.max(1, speedTowardsMe)
             if timeToImpact <= (REACTION_TIME + 0.3) and effectiveDistance > 10 then
                 if tick() - lastDodgeTick > dynamicCooldown then
