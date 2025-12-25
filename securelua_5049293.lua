@@ -1,4 +1,6 @@
--- RGH BLADE BALL ULTIMATE (AGGRESSIVE DODGE EDITION)
+-- RGH BLADE BALL ULTIMATE (FAST REACTION + PRECISION SCALING)
+-- Features: 0.25s Reaction, Halved Scaling, PreSimulation Speed
+
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
@@ -11,12 +13,16 @@ local root = char:WaitForChild("HumanoidRootPart")
 
 -- --- CONFIGURATION ---
 local DEFAULT_RANGE = 20
-local DEFAULT_PAD = 8
-local REACTION_TIME = 0.15
-local DODGE_POWER = 50 -- Increased slightly for faster 0.1s reaction
-local DODGE_DURATION = 0.3 -- Matches the "Not threatening" cooldown
+local DEFAULT_PAD = 15 
+local REACTION_TIME = 0.25 -- Increased for FASTER reaction (starts calcs earlier)
+local DODGE_POWER = 50 
+local DODGE_DURATION = 0.25 
 local PARRY_KEY = Enum.KeyCode.F
-local WALK_DISTANCE = 25 
+
+-- ** NEW **: Scaling Logic (Halved Increase)
+local USE_DYNAMIC_SCALING = true
+local SCALING_FACTOR = 20 -- Changed from 10 to 20 (Halves the growth rate)
+local MAX_SCALE_CAP = 60 
 
 -- --- VARIABLES ---
 local isDefaultSettings = true
@@ -28,11 +34,10 @@ local isVisualizerEnabled = false
 local currentRange = DEFAULT_RANGE
 local currentPad = DEFAULT_PAD
 
-local lastParryTick = 0
 local lastDodgeTick = 0
-local lastWalkTick = 0
+local hasParriedCurrentInteraction = false -- THE LOCK VARIABLE
 
-local mainLoop = nil 
+local activeBall = nil 
 local visualizerPart = nil
 
 -- --- HELPER FUNCTIONS ---
@@ -41,10 +46,10 @@ local function GetPing()
     local success, ping = pcall(function()
         return Stats.Network.ServerStatsItem["Data Ping"]:GetValue() / 1000
     end)
-    return success and ping or 0.1
+    return success and ping or 0.1 
 end
 
-local function UpdateVisualizer()
+local function UpdateVisualizer(isTargeted, currentDynamicSize)
     if not root or not root.Parent then return end
 
     if not isVisualizerEnabled then
@@ -57,7 +62,6 @@ local function UpdateVisualizer()
         visualizerPart.Name = "ParryRangeVisualizer"
         visualizerPart.Shape = Enum.PartType.Cylinder
         visualizerPart.Material = Enum.Material.ForceField
-        visualizerPart.Color = Color3.fromRGB(255, 50, 50)
         visualizerPart.Transparency = 0.8
         visualizerPart.Anchored = true
         visualizerPart.CanCollide = false
@@ -65,19 +69,31 @@ local function UpdateVisualizer()
         visualizerPart.Parent = workspace
     end
 
-    local safeRange = math.clamp(currentRange, 5, 200)
+    -- RED = DANGER (Targeted), BLUE = IDLE
+    if isTargeted then
+        visualizerPart.Color = Color3.fromRGB(255, 0, 0)
+        visualizerPart.Transparency = 0.5
+    else
+        visualizerPart.Color = Color3.fromRGB(0, 150, 255)
+        visualizerPart.Transparency = 0.85
+    end
+
+    -- Use the DYNAMIC size if provided, otherwise default
+    local sizeToUse = currentDynamicSize or currentRange
+    local safeRange = math.clamp(sizeToUse, 5, 300) 
     local size = safeRange * 2
+    
     visualizerPart.Size = Vector3.new(1, size, size)
     visualizerPart.CFrame = root.CFrame * CFrame.Angles(0, 0, math.rad(90))
 end
 
 -- --- UI CREATION ---
-if player.PlayerGui:FindFirstChild("BladeBall_Aggro_Hub") then
-    player.PlayerGui.BladeBall_Aggro_Hub:Destroy()
+if player.PlayerGui:FindFirstChild("BladeBall_Precision_Hub") then
+    player.PlayerGui.BladeBall_Precision_Hub:Destroy()
 end
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "BladeBall_Aggro_Hub"
+screenGui.Name = "BladeBall_Precision_Hub"
 screenGui.Parent = player:WaitForChild("PlayerGui")
 screenGui.ResetOnSpawn = false
 
@@ -85,25 +101,25 @@ local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
 mainFrame.Size = UDim2.new(0, 280, 0, 480)
 mainFrame.Position = UDim2.new(0.5, -140, 0.4, -200)
-mainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+mainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 18) 
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
 mainFrame.Draggable = true 
 mainFrame.Parent = screenGui
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 14)
 local border = Instance.new("UIStroke", mainFrame)
-border.Color = Color3.fromRGB(255, 0, 0)
+border.Color = Color3.fromRGB(0, 255, 150)
 border.Thickness = 2
-border.Transparency = 0.3
+border.Transparency = 0.6
 
 -- Title
 local title = Instance.new("TextLabel")
-title.Text = "BLADE BALL AGGRO"
+title.Text = "BLADE BALL PRECISION"
 title.Size = UDim2.new(1, 0, 0, 40)
-title.TextColor3 = Color3.fromRGB(255, 50, 50) 
+title.TextColor3 = Color3.fromRGB(0, 255, 150) 
 title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBlack
-title.TextSize = 22
+title.TextSize = 20
 title.Parent = mainFrame
 
 -- Close Button
@@ -116,12 +132,7 @@ closeBtn.Position = UDim2.new(1, -35, 0, 5)
 closeBtn.Font = Enum.Font.GothamBold
 closeBtn.TextSize = 20
 closeBtn.Parent = mainFrame
-
-closeBtn.MouseButton1Click:Connect(function()
-    screenGui:Destroy()
-    if visualizerPart then visualizerPart:Destroy() end
-    if mainLoop then mainLoop:Disconnect() end
-end)
+closeBtn.MouseButton1Click:Connect(function() screenGui:Destroy() end)
 
 -- Settings Container
 local settingsFrame = Instance.new("Frame")
@@ -169,8 +180,8 @@ local function CreateInput(labelText, yPos, defaultVal, callback)
     return box
 end
 
-local rangeBox = CreateInput("Range:", 50, DEFAULT_RANGE, function(val) currentRange = val end)
-local padBox = CreateInput("Hitbox:", 90, DEFAULT_PAD, function(val) currentPad = val end)
+local rangeBox = CreateInput("Base Range:", 50, DEFAULT_RANGE, function(val) currentRange = val end)
+local padBox = CreateInput("Hitbox Pad:", 90, DEFAULT_PAD, function(val) currentPad = val end)
 
 local defSwitchBtn = Instance.new("TextButton")
 defSwitchBtn.Size = UDim2.new(1, -20, 0, 30)
@@ -234,7 +245,7 @@ local function CreateToggleButton(btnText, yPos, color, callback)
 end
 
 CreateToggleButton("AUTO-PARRY", 200, Color3.fromRGB(0, 255, 100), function() isParryEnabled = not isParryEnabled return isParryEnabled end)
-CreateToggleButton("AGGRO DODGE", 255, Color3.fromRGB(255, 50, 50), function() isDodgeEnabled = not isDodgeEnabled return isDodgeEnabled end)
+CreateToggleButton("AUTO-DODGE", 255, Color3.fromRGB(0, 180, 255), function() isDodgeEnabled = not isDodgeEnabled return isDodgeEnabled end)
 CreateToggleButton("AUTO-WALK", 310, Color3.fromRGB(255, 150, 0), function() isWalkEnabled = not isWalkEnabled return isWalkEnabled end)
 CreateToggleButton("VISUALIZER", 365, Color3.fromRGB(200, 0, 255), function() 
     isVisualizerEnabled = not isVisualizerEnabled 
@@ -246,15 +257,11 @@ end)
 
 local function PerformSmoothDodge(ballPart)
     if not root then return end
-    
-    -- NOTE: Global Cooldown logic is handled in the Loop below now
     lastDodgeTick = tick()
-
     local directionToBall = (ballPart.Position - root.Position).Unit
     local rightVector = directionToBall:Cross(Vector3.new(0, 1, 0))
     local chosenDirection = rightVector
-
-    -- Raycast Check
+    
     local rayParams = RaycastParams.new()
     rayParams.FilterDescendantsInstances = {player.Character}
     rayParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -262,10 +269,9 @@ local function PerformSmoothDodge(ballPart)
         chosenDirection = -rightVector
     end
 
-    -- ANTI-FLING: Overwrite previous dodge immediately
     local oldVel = root:FindFirstChild("SmoothDodge")
     if oldVel then oldVel:Destroy() end
-
+    
     local bv = Instance.new("BodyVelocity")
     bv.Name = "SmoothDodge"
     bv.Velocity = chosenDirection * DODGE_POWER
@@ -275,74 +281,90 @@ local function PerformSmoothDodge(ballPart)
     Debris:AddItem(bv, DODGE_DURATION)
 end
 
-mainLoop = RunService.PostSimulation:Connect(function()
+-- --- FAST BALL TRACKING & MAIN LOOP ---
+
+RunService.PreSimulation:Connect(function()
     if not char or not char.Parent then
         char = player.Character
         if char then root = char:FindFirstChild("HumanoidRootPart") end
         return
     end
 
-    if isVisualizerEnabled then UpdateVisualizer() end
-
-    if not isParryEnabled and not isDodgeEnabled then return end
-
-    local ballsFolder = workspace:FindFirstChild("Balls")
-    if not ballsFolder then return end
-
-    local criticalBall = nil
-    local shortestTime = 9999
-
-    for _, part in pairs(ballsFolder:GetChildren()) do
-        if part:IsA("BasePart") then
-            local dist = (part.Position - root.Position).Magnitude
-            local vel = part.AssemblyLinearVelocity
-            local speedTowardsMe = -(part.Position - root.Position).Unit:Dot(vel)
-
-            if speedTowardsMe > 0 then
-                local time = dist / speedTowardsMe
-                if time < shortestTime then
-                    shortestTime = time
-                    criticalBall = part
+    if not activeBall or not activeBall.Parent then
+        local ballsFolder = workspace:FindFirstChild("Balls")
+        if ballsFolder then
+            for _, child in ipairs(ballsFolder:GetChildren()) do
+                if child:IsA("BasePart") then
+                    activeBall = child
+                    break
                 end
             end
         end
     end
 
-    if criticalBall then
-        local velocity = criticalBall.AssemblyLinearVelocity
-        local relativePos = criticalBall.Position - root.Position
-        local speedTowardsMe = -relativePos.Unit:Dot(velocity)
+    local isTargetingMe = false
+    local finalEffectiveRange = currentRange 
 
-        -- Lag Calculation
+    if activeBall then
+        local targetName = activeBall:GetAttribute("target")
+        isTargetingMe = (targetName == player.Name)
+        
+        -- DYNAMIC SCALING CALCULATION
+        if isTargetingMe then
+            local velocity = activeBall.AssemblyLinearVelocity
+            local relativePos = activeBall.Position - root.Position
+            local speedTowardsMe = -relativePos.Unit:Dot(velocity)
+
+            if USE_DYNAMIC_SCALING and speedTowardsMe > 0 then
+                -- SCALING FACTOR = 20 (Halved increase speed)
+                local extraRange = math.clamp(speedTowardsMe / SCALING_FACTOR, 0, MAX_SCALE_CAP)
+                finalEffectiveRange = currentRange + extraRange
+            end
+        end
+    end
+
+    if isVisualizerEnabled then UpdateVisualizer(isTargetingMe, finalEffectiveRange) end
+
+    if not activeBall then return end
+
+    -- STATE RESET
+    if not isTargetingMe then
+        hasParriedCurrentInteraction = false
+    end
+
+    -- INTERACTION LOGIC
+    if isTargetingMe then
+        local velocity = activeBall.AssemblyLinearVelocity
+        local relativePos = activeBall.Position - root.Position
+        local speedTowardsMe = -relativePos.Unit:Dot(velocity)
+        
         local ping = GetPing()
         local pingOffset = speedTowardsMe * ping
-        local rawRadius = math.max(criticalBall.Size.X, criticalBall.Size.Z) / 2
+        local rawRadius = math.max(activeBall.Size.X, activeBall.Size.Z) / 2
+        
         local effectiveDistance = (relativePos.Magnitude - rawRadius - currentPad) - pingOffset
-        local timeToImpact = effectiveDistance / math.max(1, speedTowardsMe)
-
-        -- PARRY LOGIC
-        if isParryEnabled and effectiveDistance <= currentRange and timeToImpact <= REACTION_TIME then
-            if tick() - lastParryTick > 0.1 then
-                VirtualInputManager:SendKeyEvent(true, PARRY_KEY, false, game)
-                VirtualInputManager:SendKeyEvent(false, PARRY_KEY, false, game)
-                lastParryTick = tick()
+        
+        -- *** PARRY LOGIC (PERFECT ONE TAP) ***
+        if isParryEnabled then
+            if effectiveDistance <= finalEffectiveRange then
+                if not hasParriedCurrentInteraction then
+                    VirtualInputManager:SendKeyEvent(true, PARRY_KEY, false, game)
+                    VirtualInputManager:SendKeyEvent(false, PARRY_KEY, false, game)
+                    hasParriedCurrentInteraction = true 
+                end
             end
         end
 
-        -- DODGE LOGIC (THREAT BASED)
+        -- *** DODGE LOGIC ***
         if isDodgeEnabled then
-            -- Default Cooldown (Ball is nearby but not "threatening" yet)
-            local dynamicCooldown = 0.3 
+            local dynamicCooldown = 0.4
+            if speedTowardsMe > 0 then dynamicCooldown = 0.2 end
             
-            -- HIGH THREAT: Ball is speeding towards us -> Enable SPAM DODGE (0.1s)
-            if speedTowardsMe > 0 then
-                dynamicCooldown = 0.1 
-            end
-
-            -- Execute Dodge
+            -- Uses REACTION_TIME for dodge trigger too
+            local timeToImpact = effectiveDistance / math.max(1, speedTowardsMe)
             if timeToImpact <= (REACTION_TIME + 0.3) and effectiveDistance > 10 then
                 if tick() - lastDodgeTick > dynamicCooldown then
-                    PerformSmoothDodge(criticalBall)
+                    PerformSmoothDodge(activeBall)
                 end
             end
         end
