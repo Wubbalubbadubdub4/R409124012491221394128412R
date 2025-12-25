@@ -1,5 +1,5 @@
--- RGH BLADE BALL ULTIMATE (V4 - DIRECTION CHECK + REALITY SCALING)
--- Features: 0.25s Reaction, 2% Added Reality Scale, Panic Double-Tap, Strict Direction Check
+-- RGH BLADE BALL ULTIMATE (V9.1 - CRASH FIX + 4% SCALE + LAYERS)
+-- Features: 0.25s Reaction, 4% Reality Scale, Dynamic Panic Layers, Anti-Crash
 
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -14,9 +14,10 @@ local root = char:WaitForChild("HumanoidRootPart")
 -- --- CONFIGURATION ---
 local DEFAULT_RANGE = 20
 local DEFAULT_PAD = 14     
-local PANIC_DIST = 7       
+local PANIC_DIST = 7         -- Layer 1 Base Distance
+local LAST_LAYER_DIST = 4    -- Layer 2 Base Distance
 local REACTION_TIME = 0.25 
-local DODGE_POWER = 50 
+local DODGE_POWER = 28       
 local DODGE_DURATION = 0.25 
 local PARRY_KEY = Enum.KeyCode.F
 
@@ -289,11 +290,13 @@ end
 -- --- FAST BALL TRACKING & MAIN LOOP ---
 
 RunService.PreSimulation:Connect(function()
+    -- [FIX] Ensure Character/Root exists before doing anything
     if not char or not char.Parent then
         char = player.Character
         if char then root = char:FindFirstChild("HumanoidRootPart") end
         return
     end
+    if not root or not root.Parent then return end
 
     if not activeBall or not activeBall.Parent then
         local ballsFolder = workspace:FindFirstChild("Balls")
@@ -309,32 +312,35 @@ RunService.PreSimulation:Connect(function()
 
     local isTargetingMe = false
     local finalEffectiveRange = currentRange 
+    local currentRealityBuff = 0 
 
-    if activeBall then
+    if activeBall and activeBall.Parent then -- [FIX] Added parent check
         local targetName = activeBall:GetAttribute("target")
         isTargetingMe = (targetName == player.Name)
         
         -- DYNAMIC SCALING CALCULATION
         if isTargetingMe then
+            -- [FIX] Double check existence before math
+            if not activeBall or not activeBall.Parent or not root or not root.Parent then return end 
+
             local velocity = activeBall.AssemblyLinearVelocity
             local relativePos = activeBall.Position - root.Position
             local speedTowardsMe = -relativePos.Unit:Dot(velocity)
 
             if USE_DYNAMIC_SCALING and speedTowardsMe > 0 then
-                -- 1. BASE DYNAMIC CALCULATION
                 local extraRange = math.clamp(speedTowardsMe / SCALING_FACTOR, 0, MAX_SCALE_CAP)
                 local baseDynamic = currentRange + extraRange
                 
-                -- 2. THE 2% REALITY ADDITION
-                local realityBuff = baseDynamic * 0.02
-                finalEffectiveRange = baseDynamic + realityBuff
+                -- 4% REALITY ADDITION
+                currentRealityBuff = baseDynamic * 0.04 
+                finalEffectiveRange = baseDynamic + currentRealityBuff
             end
         end
     end
 
     if isVisualizerEnabled then UpdateVisualizer(isTargetingMe, finalEffectiveRange) end
 
-    if not activeBall then return end
+    if not activeBall or not activeBall.Parent then return end
 
     -- STATE RESET
     if not isTargetingMe then
@@ -343,10 +349,12 @@ RunService.PreSimulation:Connect(function()
 
     -- INTERACTION LOGIC
     if isTargetingMe then
+        -- [FIX] Triple check existence before physics interaction
+        if not activeBall or not activeBall.Parent or not root or not root.Parent then return end 
+
         local velocity = activeBall.AssemblyLinearVelocity
         local relativePos = activeBall.Position - root.Position
         
-        -- Calculate Speed Towards Player
         local speedTowardsMe = -relativePos.Unit:Dot(velocity)
         
         local ping = GetPing()
@@ -357,17 +365,19 @@ RunService.PreSimulation:Connect(function()
         
         -- *** PARRY LOGIC (PERFECT ONE TAP) ***
         if isParryEnabled then
-            
-            -- [STRICT CHECK] Ball MUST be moving towards us (Speed > 0)
             if speedTowardsMe > 0 then
-                
-                -- [NEW] PANIC MODE: "Too Close" Logic
-                -- If ball is within 7 studs, Force F Press immediately
-                if relativePos.Magnitude <= PANIC_DIST then
+                local dist = relativePos.Magnitude
+
+                -- DYNAMIC PANIC LAYERS
+                if dist <= (PANIC_DIST + currentRealityBuff) then
                      PressParry() 
                 end
 
-                -- STANDARD LOGIC
+                if dist <= (LAST_LAYER_DIST + currentRealityBuff) then
+                     PressParry() 
+                end
+
+                -- STANDARD PRECISION
                 if effectiveDistance <= finalEffectiveRange then
                     if not hasParriedCurrentInteraction then
                         PressParry()
