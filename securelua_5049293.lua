@@ -13,7 +13,7 @@ local root = char:WaitForChild("HumanoidRootPart")
 
 -- --- CONFIGURATION ---
 local DEFAULT_RANGE = 20
-local DEFAULT_PAD = 15 
+local DEFAULT_PAD = 13 
 local REACTION_TIME = 0.25 -- Increased for FASTER reaction (starts calcs earlier)
 local DODGE_POWER = 50 
 local DODGE_DURATION = 0.25 
