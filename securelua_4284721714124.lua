@@ -85,7 +85,7 @@ gradient.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 40, 50)),
     ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 30, 40))
 })
-gradient.Rotation = 45
+gradient.Rotation = 30
 gradient.Parent = mainFrame
 
 -- Corner radius
@@ -1624,3 +1624,4 @@ end)
 setupMobileInput()
 updateGUI()
 print("Dodge Logic Fixed & Updated")
+
