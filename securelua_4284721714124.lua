@@ -653,9 +653,9 @@ dodgeStatus.Name = "DodgeStatus"
 dodgeStatus.Size = UDim2.new(1, 0, 0, 20)
 dodgeStatus.Position = UDim2.new(0, 0, 0, 95)
 dodgeStatus.BackgroundTransparency = 1
-dodgeStatus.Text = "Configure what to avoid above"
+dodgeStatus.Text = "Configure what to avoid above Tip: Do not get cornered using Auto-Dodge."
 dodgeStatus.TextColor3 = Color3.fromRGB(120, 120, 140)
-dodgeStatus.TextSize = 11
+dodgeStatus.TextSize = 8
 dodgeStatus.Font = Enum.Font.Gotham
 dodgeStatus.TextXAlignment = Enum.TextXAlignment.Left
 dodgeStatus.Parent = dodgeContainer
@@ -1624,4 +1624,5 @@ end)
 setupMobileInput()
 updateGUI()
 print("Dodge Logic Fixed & Updated")
+
 
