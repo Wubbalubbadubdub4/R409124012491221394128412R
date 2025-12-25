@@ -1,5 +1,5 @@
--- RGH BLADE BALL ULTIMATE (FAST REACTION + PRECISION SCALING)
--- Features: 0.25s Reaction, Halved Scaling, PreSimulation Speed
+-- RGH BLADE BALL ULTIMATE (V4 - DIRECTION CHECK + REALITY SCALING)
+-- Features: 0.25s Reaction, 2% Added Reality Scale, Panic Double-Tap, Strict Direction Check
 
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -13,15 +13,16 @@ local root = char:WaitForChild("HumanoidRootPart")
 
 -- --- CONFIGURATION ---
 local DEFAULT_RANGE = 20
-local DEFAULT_PAD = 13 
-local REACTION_TIME = 0.25 -- Increased for FASTER reaction (starts calcs earlier)
+local DEFAULT_PAD = 14     
+local PANIC_DIST = 7       
+local REACTION_TIME = 0.25 
 local DODGE_POWER = 50 
 local DODGE_DURATION = 0.25 
 local PARRY_KEY = Enum.KeyCode.F
 
--- ** NEW **: Scaling Logic (Halved Increase)
+-- ** SCALING LOGIC **
 local USE_DYNAMIC_SCALING = true
-local SCALING_FACTOR = 20 -- Changed from 10 to 20 (Halves the growth rate)
+local SCALING_FACTOR = 20 
 local MAX_SCALE_CAP = 60 
 
 -- --- VARIABLES ---
@@ -49,6 +50,11 @@ local function GetPing()
     return success and ping or 0.1 
 end
 
+local function PressParry()
+    VirtualInputManager:SendKeyEvent(true, PARRY_KEY, false, game)
+    VirtualInputManager:SendKeyEvent(false, PARRY_KEY, false, game)
+end
+
 local function UpdateVisualizer(isTargeted, currentDynamicSize)
     if not root or not root.Parent then return end
 
@@ -72,13 +78,12 @@ local function UpdateVisualizer(isTargeted, currentDynamicSize)
     -- RED = DANGER (Targeted), BLUE = IDLE
     if isTargeted then
         visualizerPart.Color = Color3.fromRGB(255, 0, 0)
-        visualizerPart.Transparency = 0.5
+        visualizerPart.Transparency = 0.4
     else
         visualizerPart.Color = Color3.fromRGB(0, 150, 255)
         visualizerPart.Transparency = 0.85
     end
 
-    -- Use the DYNAMIC size if provided, otherwise default
     local sizeToUse = currentDynamicSize or currentRange
     local safeRange = math.clamp(sizeToUse, 5, 300) 
     local size = safeRange * 2
@@ -316,9 +321,13 @@ RunService.PreSimulation:Connect(function()
             local speedTowardsMe = -relativePos.Unit:Dot(velocity)
 
             if USE_DYNAMIC_SCALING and speedTowardsMe > 0 then
-                -- SCALING FACTOR = 20 (Halved increase speed)
+                -- 1. BASE DYNAMIC CALCULATION
                 local extraRange = math.clamp(speedTowardsMe / SCALING_FACTOR, 0, MAX_SCALE_CAP)
-                finalEffectiveRange = currentRange + extraRange
+                local baseDynamic = currentRange + extraRange
+                
+                -- 2. THE 2% REALITY ADDITION
+                local realityBuff = baseDynamic * 0.02
+                finalEffectiveRange = baseDynamic + realityBuff
             end
         end
     end
@@ -336,6 +345,8 @@ RunService.PreSimulation:Connect(function()
     if isTargetingMe then
         local velocity = activeBall.AssemblyLinearVelocity
         local relativePos = activeBall.Position - root.Position
+        
+        -- Calculate Speed Towards Player
         local speedTowardsMe = -relativePos.Unit:Dot(velocity)
         
         local ping = GetPing()
@@ -346,11 +357,22 @@ RunService.PreSimulation:Connect(function()
         
         -- *** PARRY LOGIC (PERFECT ONE TAP) ***
         if isParryEnabled then
-            if effectiveDistance <= finalEffectiveRange then
-                if not hasParriedCurrentInteraction then
-                    VirtualInputManager:SendKeyEvent(true, PARRY_KEY, false, game)
-                    VirtualInputManager:SendKeyEvent(false, PARRY_KEY, false, game)
-                    hasParriedCurrentInteraction = true 
+            
+            -- [STRICT CHECK] Ball MUST be moving towards us (Speed > 0)
+            if speedTowardsMe > 0 then
+                
+                -- [NEW] PANIC MODE: "Too Close" Logic
+                -- If ball is within 7 studs, Force F Press immediately
+                if relativePos.Magnitude <= PANIC_DIST then
+                     PressParry() 
+                end
+
+                -- STANDARD LOGIC
+                if effectiveDistance <= finalEffectiveRange then
+                    if not hasParriedCurrentInteraction then
+                        PressParry()
+                        hasParriedCurrentInteraction = true 
+                    end
                 end
             end
         end
@@ -360,7 +382,6 @@ RunService.PreSimulation:Connect(function()
             local dynamicCooldown = 0.4
             if speedTowardsMe > 0 then dynamicCooldown = 0.2 end
             
-            -- Uses REACTION_TIME for dodge trigger too
             local timeToImpact = effectiveDistance / math.max(1, speedTowardsMe)
             if timeToImpact <= (REACTION_TIME + 0.3) and effectiveDistance > 10 then
                 if tick() - lastDodgeTick > dynamicCooldown then
