@@ -9,6 +9,9 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local mouse = player:GetMouse()
 
+-- CHECK FOR MOBILE DEVICE
+local isMobile = UserInputService.TouchEnabled
+
 -- Create main GUI
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "FlyControlGUI_Fixed"
@@ -242,7 +245,7 @@ hotkeyHeader.Name = "HotkeyHeader"
 hotkeyHeader.Size = UDim2.new(1, 0, 0, 25)
 hotkeyHeader.Position = UDim2.new(0, 0, 0, 0)
 hotkeyHeader.BackgroundTransparency = 1
-hotkeyHeader.Text = "CONTROL HOTKEY"
+hotkeyHeader.Text = "CONTROL METHOD" -- Renamed from Hotkey
 hotkeyHeader.TextColor3 = Color3.fromRGB(180, 180, 200)
 hotkeyHeader.TextSize = 14
 hotkeyHeader.Font = Enum.Font.GothamBold
@@ -283,6 +286,14 @@ hotkeyCorner.Parent = hotkeyButton
 
 hotkeyButton.Parent = hotkeyButtonContainer
 hotkeyButtonContainer.Parent = hotkeyContainer
+
+-- MOBILE ADAPTATION FOR MENU
+if isMobile then
+    hotkeyLabel.Text = "Mobile Mode:"
+    hotkeyButton.Text = "TOUCH ENABLED"
+    hotkeyButton.BackgroundColor3 = Color3.fromRGB(80, 180, 80)
+    hotkeyButton.AutoButtonColor = false
+end
 
 -- Auto-Track section
 local trackContainer = Instance.new("Frame")
@@ -1455,7 +1466,8 @@ local function toggleMobileFly()
     updateGUI()
 end
 
-local function setupMobileInput()
+-- Function renamed to setupFlyButton to avoid confusion
+local function setupFlyButton()
     local mobileFlyButton = Instance.new("TextButton")
     mobileFlyButton.Name = "MobileFlyButton"
     mobileFlyButton.Size = UDim2.new(0, 80, 0, 80)
@@ -1473,11 +1485,11 @@ local function setupMobileInput()
     mobileCorner.Parent = mobileFlyButton
     mobileFlyButton.Parent = screenGui
     
-    if UserInputService.TouchEnabled then mobileFlyButton.Visible = true end
+    -- Only show if mobile fly enabled AND user is on mobile
+    if isMobile then mobileFlyButton.Visible = true end
     
     mobileFlyButton.MouseButton1Down:Connect(function() if mobileFlyEnabled then startMobileFly() end end)
     mobileFlyButton.MouseButton1Up:Connect(function() stopMobileFly() end)
-    mobileFlyButton.TouchLongPress:Connect(function() if mobileFlyEnabled then startMobileFly() end end)
 end
 
 local function startAutoTrack()
@@ -1515,14 +1527,43 @@ end
 
 local function stopMoving() isMoving = false updateGUI() end
 
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == currentHotkey then startMoving() end
-end)
+-- KEYBOARD INPUT (Only active if NOT mobile)
+if not isMobile then
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == currentHotkey then startMoving() end
+    end)
 
-UserInputService.InputEnded:Connect(function(input, gameProcessed)
-    if input.KeyCode == currentHotkey then stopMoving() end
-end)
+    UserInputService.InputEnded:Connect(function(input, gameProcessed)
+        if input.KeyCode == currentHotkey then stopMoving() end
+    end)
+end
+
+-- MOBILE MOVEMENT BUTTON (New Feature)
+local function setupMobileMoveButton()
+    if not isMobile then return end
+    
+    local moveBtn = Instance.new("TextButton")
+    moveBtn.Name = "MobileMoveButton"
+    moveBtn.Size = UDim2.new(0, 90, 0, 90)
+    -- Positioned above the Jump button usually found on bottom right
+    moveBtn.Position = UDim2.new(1, -120, 1, -220) 
+    moveBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+    moveBtn.BackgroundTransparency = 0.4
+    moveBtn.Text = "HOLD\nMOVE"
+    moveBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    moveBtn.TextSize = 14
+    moveBtn.Font = Enum.Font.GothamBlack
+    moveBtn.Parent = screenGui
+    
+    local mCorner = Instance.new("UICorner")
+    mCorner.CornerRadius = UDim.new(1, 0) -- Circle
+    mCorner.Parent = moveBtn
+    
+    moveBtn.MouseButton1Down:Connect(startMoving)
+    moveBtn.MouseButton1Up:Connect(stopMoving)
+    moveBtn.MouseLeave:Connect(stopMoving)
+end
 
 closeButton.MouseButton1Click:Connect(function()
     mainFrame.Visible = false
@@ -1546,6 +1587,9 @@ end)
 
 local waitingForHotkey = false
 hotkeyButton.MouseButton1Click:Connect(function()
+    -- Disable hotkey binder if on mobile
+    if isMobile then return end
+    
     if not waitingForHotkey then
         waitingForHotkey = true
         hotkeyButton.Text = "..."
@@ -1621,9 +1665,7 @@ RunService.Heartbeat:Connect(function()
     if rootPart and rootPart.Parent then handleAntiTeleport() end
 end)
 
-setupMobileInput()
+setupFlyButton()
+setupMobileMoveButton() -- Initialize the new mobile button
 updateGUI()
-print("Dodge Logic Fixed & Updated")
-
-
-
+print("Mobile Compatibility Added")
